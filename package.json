@@ -1,0 +1,24 @@
+{
+  "name": "memorial",
+  "version": "1.0.0",
+  "description": "Sistema de Memorial Multi-Funeraria para transmisiones en vivo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["memorial", "funeraria", "streaming", "socket.io", "nodejs"],
+  "author": "Sistema Memorial",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^13.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

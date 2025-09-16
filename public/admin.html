@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - Sistema Memorial</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">🕯️ Sistema Memorial - Administración</div>
+                <nav>
+                    <ul class="nav-links">
+                        <li><a href="/">Inicio</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container" style="margin-top: 40px;">
+        <div class="card" style="max-width: 400px; margin: 0 auto;">
+            <h2 style="text-align: center; margin-bottom: 30px;">Iniciar Sesión</h2>
+            
+            <div id="login-alerts"></div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label class="form-label">Email:</label>
+                    <input type="email" id="login-email" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Contraseña:</label>
+                    <input type="password" id="login-password" class="form-control" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <span id="login-loading" class="loading" style="display: none;"></span>
+                    Iniciar Sesión
+                </button>
+            </form>
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <p>¿No tienes cuenta? <a href="/registro.html">Registra tu funeraria</a></p>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 15px; background-color: var(--background-light); border-radius: 6px;">
+                <strong>Demostración:</strong><br>
+                Email: admin@demo.com<br>
+                Contraseña: demo123
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const loading = document.getElementById('login-loading');
+            const alerts = document.getElementById('login-alerts');
+            
+            loading.style.display = 'inline-block';
+            alerts.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/funerarias/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('funeraria', JSON.stringify(data.funeraria));
+                    window.location.href = `/dashboard.html?id=${data.funeraria.id}`;
+                } else {
+                    alerts.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
+                }
+            } catch (error) {
+                alerts.innerHTML = `<div class="alert alert-error">Error de conexión</div>`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
