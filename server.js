@@ -461,6 +461,17 @@ io.on('connection', (socket) => {
 });
 
 // 6. RUTAS DE PÁGINAS
+
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    service: 'Sistema Memorial'
+  });
+});
+
 // Para cualquier otra ruta que no sea un archivo estático, enviamos index.html.
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));

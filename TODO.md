@@ -1,40 +1,25 @@
-# 🚀 TODO - Deploy Sistema Memorial en Railway
+# TODO - Fix Railway Healthcheck Failure
 
-## ✅ COMPLETADO
-- [x] Sistema Memorial desarrollado y funcionando localmente
-- [x] Archivos de configuración preparados (railway.toml, package.json)
-- [x] Usuario registrado en Railway
+## ✅ Analysis Complete
+- [x] Identified healthcheck failure cause
+- [x] Server serves HTML file at "/" which requires additional resources
+- [x] Railway healthcheck times out waiting for complete page load
 
-## 📋 PASOS A SEGUIR
+## ✅ Implementation Complete
+- [x] Add dedicated `/health` endpoint to server.js
+- [x] Update railway.toml to use `/health` path
+- [x] Test health endpoint locally ✅ Returns 200 OK with JSON status
+- [ ] Verify Railway deployment
 
-### FASE 1: Preparación del Repositorio
-- [ ] **Paso 1**: Verificar que Git esté instalado
-- [ ] **Paso 2**: Inicializar repositorio Git local
-- [ ] **Paso 3**: Crear repositorio en GitHub
-- [ ] **Paso 4**: Conectar repositorio local con GitHub
-- [ ] **Paso 5**: Subir código a GitHub
+## 📋 Changes Made
+1. **server.js**: ✅ Added `/health` endpoint that returns JSON response with status, timestamp, uptime, and service name
+2. **railway.toml**: ✅ Updated healthcheckPath from "/" to "/health" and reduced timeout from 300s to 60s
 
-### FASE 2: Configuración de Seguridad
-- [ ] **Paso 6**: Generar JWT_SECRET seguro
-- [ ] **Paso 7**: Preparar variables de entorno
+## 🎯 Expected Result
+- Railway healthcheck passes successfully
+- Deployment completes without network/healthcheck failures
+- Application remains fully functional
 
-### FASE 3: Deploy en Railway
-- [ ] **Paso 8**: Crear nuevo proyecto en Railway
-- [ ] **Paso 9**: Conectar repositorio GitHub a Railway
-- [ ] **Paso 10**: Configurar variables de entorno en Railway
-- [ ] **Paso 11**: Realizar deploy automático
-
-### FASE 4: Verificación
-- [ ] **Paso 12**: Probar página de admin
-- [ ] **Paso 13**: Probar registro de funerarias
-- [ ] **Paso 14**: Probar evento demo
-- [ ] **Paso 15**: Verificar chat en tiempo real
-- [ ] **Paso 16**: Confirmar videos de YouTube
-
-## 🎯 RESULTADO ESPERADO
-- Sistema Memorial funcionando en: `https://tu-proyecto.railway.app`
-- Todas las funcionalidades operativas en producción
-- URLs públicas accesibles desde cualquier dispositivo
-
----
-**Estado actual**: Iniciando Fase 1 - Preparación del Repositorio
+## 🧪 Next Steps
+- Test the health endpoint locally
+- Deploy to Railway and verify healthcheck passes
