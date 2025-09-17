@@ -1,4 +1,10 @@
 // 1. REQUERIR LAS LIBRERÍAS (Nuestras "herramientas")
+console.log('🚀 Iniciando Sistema Memorial...');
+console.log('📊 Variables de entorno:', {
+  PORT: process.env.PORT,
+  NODE_ENV: process.env.NODE_ENV,
+  JWT_SECRET: process.env.JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO'
+});
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
@@ -6,6 +12,7 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+console.log('📦 Librerías cargadas correctamente');
 
 // 2. INICIALIZACIÓN
 const app = express();
@@ -13,7 +20,15 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PUERTO = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const HOST = process.env.PORT ? '0.0.0.0' : 'localhost';
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura_cambiala_en_produccion_' + Math.random().toString(36).substring(2, 15);
+
+// Logging de configuración inicial
+console.log('🔧 Configuración del servidor:');
+console.log(`   - Puerto: ${PUERTO}`);
+console.log(`   - Host: ${HOST}`);
+console.log(`   - Entorno: ${process.env.NODE_ENV || 'development'}`);
+console.log(`   - JWT_SECRET configurado: ${process.env.JWT_SECRET ? '✅ Sí' : '❌ No (usando temporal)'}`);
 
 // Advertencia si se está usando JWT_SECRET por defecto en producción
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -464,11 +479,15 @@ io.on('connection', (socket) => {
 
 // Health check endpoint for Railway
 app.get('/health', (req, res) => {
+  console.log('🏥 Health check solicitado');
   res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    service: 'Sistema Memorial'
+    service: 'Sistema Memorial',
+    environment: process.env.NODE_ENV || 'development',
+    port: PUERTO,
+    host: HOST
   });
 });
 
@@ -497,9 +516,48 @@ app.get('/registro', (req, res) => {
 });
 
 // 7. INICIAR EL SERVIDOR
-server.listen(PUERTO, () => {
-  console.log(`🚀 Servidor escuchando en http://localhost:${PUERTO}`);
-  console.log(`📋 Admin demo: http://localhost:${PUERTO}/admin`);
-  console.log(`📝 Registro: http://localhost:${PUERTO}/registro`);
-  console.log(`🕯️  Evento demo: http://localhost:${PUERTO}/evento/evento-1`);
+server.listen(PUERTO, HOST, () => {
+  console.log(`🚀 Servidor iniciado exitosamente!`);
+  console.log(`   - Escuchando en: http://${HOST}:${PUERTO}`);
+  console.log(`   - Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`   - Health check: http://${HOST}:${PUERTO}/health`);
+  console.log(`📋 URLs disponibles:`);
+  console.log(`   - Admin: http://${HOST}:${PUERTO}/admin`);
+  console.log(`   - Registro: http://${HOST}:${PUERTO}/registro`);
+  console.log(`   - Evento demo: http://${HOST}:${PUERTO}/evento/evento-1`);
+  console.log(`✅ Sistema Memorial listo para recibir conexiones`);
+
+  // Para Railway: asegurar que el servidor esté completamente listo
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🏥 Verificando health check endpoint...');
+    // Pequeño delay para asegurar que todo esté inicializado
+    setTimeout(() => {
+      console.log('✅ Servidor completamente listo para Railway');
+    }, 1000);
+  }
+}).on('error', (err) => {
+  console.error('❌ Error al iniciar el servidor:', err);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`   Puerto ${PUERTO} ya está en uso`);
+  } else if (err.code === 'EACCES') {
+    console.error(`   Sin permisos para usar el puerto ${PUERTO}`);
+  }
+  process.exit(1);
+});
+
+// Manejo de señales para cierre graceful
+process.on('SIGTERM', () => {
+  console.log('🔄 Recibida señal SIGTERM, cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🔄 Recibida señal SIGINT, cerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente');
+    process.exit(0);
+  });
 });
