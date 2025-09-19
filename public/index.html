@@ -1,25 +1,486 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Sistema Memorial</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Memorial - Transmisiones en Vivo para Servicios Fúnebres</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(180deg, #0a0a23 0%, #1e1e3a 100%);
+            color: #e0e7ff;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* Header Styles */
+        header {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(147, 197, 253, 0.2);
+        }
+        .header-logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #93c5fd;
+            text-shadow: 0 0 10px rgba(147, 197, 253, 0.5);
+        }
+        .nav-link {
+            color: #e0e7ff;
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #93c5fd;
+            text-shadow: 0 0 5px rgba(147, 197, 253, 0.3);
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"><defs><filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="M500,200 C650,200 750,300 750,450 C750,600 650,700 500,700 C350,700 250,600 250,450 C250,300 350,200 500,200" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2" filter="url(#glow)"/></svg>') no-repeat center/cover;
+            animation: subtlePulse 12s infinite ease-in-out;
+        }
+        @keyframes subtlePulse {
+            0%, 100% { transform: scale(1); opacity: 0.4; }
+            50% { transform: scale(1.1); opacity: 0.2; }
+        }
+
+        /* Ethereal Text Effect */
+        .ethereal-text {
+            text-shadow: 0 0 15px rgba(147, 197, 253, 0.7), 0 0 25px rgba(147, 197, 253, 0.3);
+            animation: etherealGlow 4s infinite ease-in-out;
+        }
+        @keyframes etherealGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.9; }
+        }
+
+        /* Live Stream Preview Section */
+        .stream-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(147, 197, 253, 0.3);
+        }
+        .stream-container canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Memorial Card Effect */
+        .memorial-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 2rem;
+            transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), box-shadow 0.6s;
+            position: relative;
+            overflow: hidden;
+        }
+        .memorial-card:hover {
+            transform: translateY(-8px) rotate(1deg);
+            box-shadow: 0 15px 35px rgba(147, 197, 253, 0.3);
+        }
+        .memorial-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(147,197,253,0.15), transparent);
+            opacity: 0;
+            transition: opacity 0.6s;
+        }
+        .memorial-card:hover::before {
+            opacity: 1;
+        }
+
+        /* CTA Button */
+        .cta-button {
+            background: linear-gradient(45deg, #93c5fd, #3b82f6);
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            color: white;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+        .cta-button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+            transition: 0.6s;
+        }
+        .cta-button:hover::after {
+            left: 100%;
+        }
+        .cta-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 25px rgba(147,197,253,0.5);
+        }
+
+        /* Footer Styles */
+        footer {
+            background: rgba(0,0,0,0.8);
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+            color: #e0e7ff;
+        }
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #93c5fd, transparent);
+            animation: slide 6s infinite;
+        }
+        @keyframes slide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .footer-link {
+            color: #93c5fd;
+            transition: color 0.3s ease;
+        }
+        .footer-link:hover {
+            color: #e0e7ff;
+            text-shadow: 0 0 5px rgba(147, 197, 253, 0.5);
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- El contenido se cargará dinámicamente aquí -->
-    </div>
+    <!-- Header -->
+    <header class="flex justify-between items-center">
+        <div class="header-logo">
+            <i class="fas fa-dove mr-2"></i>Memorial
+        </div>
+        <nav class="space-x-6">
+            <a href="#home" class="nav-link">Inicio</a>
+            <a href="#features" class="nav-link">Características</a>
+            <a href="#contact" class="nav-link">Contacto</a>
+            <a href="registro.html" class="nav-link">Iniciar Sesión</a>
+            <a href="#demo" class="nav-link">Demo</a>
+        </nav>
+    </header>
 
-    <!-- Scripts -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/router.js"></script>
-    <script src="/js/auth.js"></script>
-    <script src="/js/admin.js"></script>
-    <script src="/js/evento.js"></script>
-    <script src="/js/app.js"></script>
-</body>
-</html>
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="text-center z-10 px-4">
+            <h1 class="text-5xl md:text-7xl font-extrabold ethereal-text mb-6">Memorial</h1>
+            <p class="text-lg md:text-xl mb-8 max-w-3xl mx-auto">Ofrece a las familias un adiós digno con transmisiones en vivo profesionales y seguras para servicios fúnebres, diseñadas para empresas funerarias.</p>
+            <button class="cta-button"><i class="fas fa-video mr-2"></i>Descubre el Servicio</button>
+        </div>
+    </section>
+
+    <!-- Live Stream Preview Section -->
+    <section id="features" class="container mx-auto py-12 px-4">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl md:text-5xl font-bold ethereal-text">Transmisiones en Vivo de Alta Calidad</h2>
+            <p class="text-lg md:text-xl mt-4 max-w-3xl mx-auto">Proporciona a tus clientes una experiencia de streaming fluida, privada y respetuosa, accesible desde cualquier dispositivo.</p>
+        </div>
+        <div class="stream-container mx-auto">
+            <canvas id="streamPreview"></canvas>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+            <div class="memorial-card">
+                <i class="fas fa-video fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-2xl font-semibold">Streaming Seguro</h3>
+                <p>Transmisiones en vivo protegidas con acceso restringido, garantizando privacidad para las familias.</p>
+            </div>
+            <div class="memorial-card">
+                <i class="fas fa-mobile-alt fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-2xl font-semibold">Multiplataforma</h3>
+                <p>Compatible con móviles, tablets y desktops para que todos puedan participar.</p>
+            </div>
+            <div class="memorial-card">
+                <i class="fas fa-shield-alt fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-2xl font-semibold">Fiabilidad Garantizada</h3>
+                <p>Infraestructura robusta en Railway con health checks optimizados.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features for Funeral Homes -->
+    <section class="container mx-auto py-12 px-4">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold">Beneficios para Empresas Funerarias</h2>
+            <p class="text-lg mt-4 max-w-3xl mx-auto">Un servicio diseñado para fortalecer la oferta de tu empresa, con tecnología de punta y soporte continuo.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="memorial-card text-center">
+                <i class="fas fa-users fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-xl font-semibold">Conexión Emocional</h3>
+                <p>Permite a las familias despedirse desde cualquier lugar con transmisiones en vivo.</p>
+            </div>
+            <div class="memorial-card text-center">
+                <i class="fas fa-cogs fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-xl font-semibold">Integración Sencilla</h3>
+                <p>API y configuración flexible para adaptarse a tus sistemas existentes.</p>
+            </div>
+            <div class="memorial-card text-center">
+                <i class="fas fa-tachometer-alt fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-xl font-semibold">Alto Rendimiento</h3>
+                <p>Servidor optimizado con logging detallado y cierre graceful.</p>
+            </div>
+            <div class="memorial-card text-center">
+                <i class="fas fa-headset fa-3x text-blue-400 mb-4"></i>
+                <h3 class="text-xl font-semibold">Soporte 24/7</h3>
+                <p>Asistencia técnica dedicada para garantizar transmisiones sin interrupciones.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="contact" class="container mx-auto py-12 px-4 text-center">
+        <h2 class="text-4xl font-bold ethereal-text">Eleva Tu Servicio Funerario</h2>
+        <p class="text-lg mt-4 max-w-2xl mx-auto">Contacta con nosotros para integrar transmisiones en vivo profesionales y ofrecer un servicio moderno y respetuoso.</p>
+        <button class="cta-button mt-6"><i class="fas fa-envelope mr-2"></i>Contáctanos</button>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="header-logo mb-4 md:mb-0">
+                    <i class="fas fa-dove mr-2"></i>Memorial
+                </div>
+                <div class="space-x-6">
+                    <a href="#home" class="footer-link">Inicio</a>
+                    <a href="#features" class="footer-link">Características</a>
+                    <a href="#contact" class="footer-link">Contacto</a>
+                    <a href="registro.html" class="footer-link">Iniciar Sesión</a>
+                    <a href="#demo" class="footer-link">Demo</a>
+                </div>
+            </div>
+            <p class="mt-4">&copy; 2025 Memorial. Desplegado con éxito en Railway. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.141.0/build/three.min.js"></script>
+    <script>
+        // Simulated Live Stream Preview using Three.js with Cross Icons
+        const canvas = document.getElementById('streamPreview');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+        // Create cross-themed sprites (Latin cross, Celtic cross)
+        function createCrossSprite(type) {
+            const spriteCanvas = document.createElement('canvas');
+            spriteCanvas.width = 32;
+            spriteCanvas.height = 32;
+            const ctx = spriteCanvas.getContext('2d');
+
+            ctx.fillStyle = 'rgba(147, 197, 253, 0.8)';
+            ctx.filter = 'blur(2px)';
+
+            if (type === 'latin') {
+                // Latin cross shape
+                ctx.beginPath();
+                ctx.rect(14, 6, 4, 20); // Vertical beam
+                ctx.rect(8, 12, 16, 4); // Horizontal beam
+                ctx.fill();
+            } else if (type === 'celtic') {
+                // Celtic cross shape (cross with a circle)
+                ctx.beginPath();
+                ctx.rect(14, 6, 4, 20); // Vertical beam
+                ctx.rect(8, 12, 16, 4); // Horizontal beam
+                ctx.arc(16, 12, 6, 0, Math.PI * 2); // Circle at intersection
+                ctx.fill();
+            }
+
+            const texture = new THREE.Texture(spriteCanvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // Create textures for each cross icon
+        const latinCrossTexture = createCrossSprite('latin');
+        const celticCrossTexture = createCrossSprite('celtic');
+        const textures = [latinCrossTexture, celticCrossTexture];
+
+        // Create particle system with cross-themed icons
+        const particles = new THREE.BufferGeometry();
+        const particleCount = 100; // Reduced for performance and subtlety
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const spriteIndices = new Float32Array(particleCount); // To select texture
+
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 300;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 300;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 300;
+            colors[i * 3] = 0.36; // Blue hue for condolence theme
+            colors[i * 3 + 1] = 0.58;
+            colors[i * 3 + 2] = 0.96;
+            sizes[i] = Math.random() * 10 + 5; // Larger size for visibility
+            spriteIndices[i] = Math.floor(Math.random() * 2); // Randomly select Latin or Celtic cross
+        }
+
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        particles.setAttribute('spriteIndex', new THREE.BufferAttribute(spriteIndices, 1));
+
+        // Custom shader to handle multiple textures
+        const material = new THREE.ShaderMaterial({
+            uniforms: {
+                latinCrossTexture: { value: latinCrossTexture },
+                celticCrossTexture: { value: celticCrossTexture }
+            },
+            vertexShader: `
+                attribute vec3 color;
+                attribute float size;
+                attribute float spriteIndex;
+                varying vec3 vColor;
+                varying float vSpriteIndex;
+                void main() {
+                    vColor = color;
+                    vSpriteIndex = spriteIndex;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D latinCrossTexture;
+                uniform sampler2D celticCrossTexture;
+                varying vec3 vColor;
+                varying float vSpriteIndex;
+                void main() {
+                    vec4 texColor;
+                    if (vSpriteIndex < 1.0) {
+                        texColor = texture2D(latinCrossTexture, gl_PointCoord);
+                    } else {
+                        texColor = texture2D(celticCrossTexture, gl_PointCoord);
+                    }
+                    if (texColor.a < 0.1) discard;
+                    gl_FragColor = vec4(vColor * texColor.rgb, texColor.a);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthTest: false
+        });
+
+        const particleSystem = new THREE.Points(particles, material);
+        scene.add(particleSystem);
+
+        camera.position.z = 200;
+
+        // Animation loop with gentle movement
+        function animate() {
+            requestAnimationFrame(animate);
+            particleSystem.rotation.y += 0.0003; // Slower rotation for a calm effect
+            particleSystem.rotation.x += 0.0001;
+            const positions = particleSystem.geometry.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                // Add subtle floating motion to simulate crosses
+                positions[i * 3 + 1] += Math.sin(Date.now() * 0.001 + i) * 0.02;
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Interactive mouse movement
+        let mouseX = 0, mouseY = 0;
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            camera.position.x += (mouseX * 50 - camera.position.x) * 0.05;
+            camera.position.y += (mouseY * 50 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+        });
+
+        // Responsive canvas
+        window.addEventListener('resize', () => {
+            renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+            camera.aspect = canvas.clientWidth / canvas.clientHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        // CTA button action
+        document.querySelectorAll('.cta-button').forEach(button => {
+            button.addEventListener('click', () => {
+                alert('¡Contáctanos para una demo de nuestras transmisiones en vivo profesionales!');
+            });
+        });
+    </script>
