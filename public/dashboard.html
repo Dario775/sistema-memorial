@@ -87,6 +87,18 @@
                         </div>
                         
                         <div class="form-group">
+                            <label class="form-label">📸 Foto del Finado:</label>
+                            <input type="file" id="event-foto" class="form-control" accept="image/*">
+                            <small style="color: var(--text-secondary);">
+                                Opcional - Formatos: JPG, PNG, GIF (máx. 5MB)<br>
+                                📏 <strong>Medidas recomendadas:</strong> 400x400px o superior (formato cuadrado para mejor visualización)
+                            </small>
+                            <div id="foto-preview" style="margin-top: 10px; display: none;">
+                                <img id="foto-preview-img" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 2px solid var(--border-color); object-fit: cover;">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
                             <label style="display: flex; align-items: center; gap: 10px;">
                                 <input type="checkbox" id="event-activo" checked>
                                 <span>Evento activo</span>
@@ -147,8 +159,18 @@
             const eventosHtml = eventos.map(evento => `
                 <div class="card" style="margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+                        <div style="flex-shrink: 0;">
+                            <img id="img-${evento.id}" src="${evento.fotoUrl ? (evento.fotoUrl.startsWith('/') ? window.location.origin + evento.fotoUrl : evento.fotoUrl) : 'https://via.placeholder.com/120?text=Foto'}" alt="Foto de ${evento.nombre}" 
+                                 style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+                                 onerror="this.onerror=null;this.src='https://via.placeholder.com/120?text=Foto';">
+                            <div style="font-size:12px; color:#666; margin-top:6px; max-width:120px; word-break:break-all;">${evento.fotoUrl || 'no-foto'}</div>
+                        </div>
+                        
                         <div style="flex: 1;">
-                            <h4>${evento.nombre}</h4>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+                                <h4 style="margin: 0;">${evento.nombre}</h4>
+                                ${evento.fotoUrl ? '<span style="color: var(--success-color); font-size: 12px;">📸</span>' : '<span style="color: var(--text-secondary); font-size: 12px;">📷</span>'}
+                            </div>
                             <p style="color: var(--text-secondary); margin: 5px 0;">${evento.displayPhrase}</p>
                             <div style="margin: 10px 0;">
                                 <span class="badge ${evento.activo ? 'badge-success' : 'badge-secondary'}">
@@ -165,7 +187,7 @@
                                 <label style="font-weight: 600; margin-bottom: 5px; display: block; color: var(--primary-color);">📎 Link Compartible:</label>
                                 <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                                     <input type="text" readonly class="form-control" style="flex: 1; min-width: 300px; font-size: 12px; font-family: monospace;"
-                                           value="http://localhost:3000/evento/${evento.id}?code=${evento.accessCode}"
+                                           value="${window.location.origin}/evento/${evento.id}?code=${evento.accessCode}"
                                            id="link-${evento.id}"
                                            onclick="this.select()">
                                     <button onclick="copyLink('${evento.id}')" class="btn btn-secondary btn-sm" style="padding: 8px 12px;">
@@ -206,6 +228,9 @@
             document.getElementById('event-id').value = '';
             document.getElementById('event-activo').checked = true;
             document.getElementById('event-form-text').textContent = 'Crear';
+            // Limpiar preview de foto
+            document.getElementById('foto-preview').style.display = 'none';
+            document.getElementById('event-foto').value = '';
             document.getElementById('event-modal').style.display = 'block';
         }
 
@@ -226,6 +251,9 @@
         function hideEventModal() {
             document.getElementById('event-modal').style.display = 'none';
             document.getElementById('modal-alerts').innerHTML = '';
+            // Limpiar preview de foto
+            document.getElementById('foto-preview').style.display = 'none';
+            document.getElementById('event-foto').value = '';
         }
 
         async function toggleEvento(eventoId, newStatus) {
@@ -325,6 +353,7 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
             const displayPhrase = document.getElementById('event-frase').value;
             const youtubeVideoId = document.getElementById('event-video').value;
             const activo = document.getElementById('event-activo').checked;
+            const fotoFile = document.getElementById('event-foto').files[0];
             
             const loading = document.getElementById('event-form-loading');
             const alerts = document.getElementById('modal-alerts');
@@ -333,6 +362,7 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
             alerts.innerHTML = '';
             
             try {
+                // Primero crear/actualizar el evento
                 const url = eventId 
                     ? `/api/funerarias/${funerariaId}/eventos/${eventId}`
                     : `/api/funerarias/${funerariaId}/eventos`;
@@ -350,20 +380,113 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
                 });
                 
                 if (response.ok) {
+                    const eventoData = await response.json();
+                    const finalEventId = eventId || eventoData.id;
+                    
+                    // Si hay una foto, subirla
+                    if (fotoFile) {
+                        try {
+                            const uploadedUrl = await subirFotoEvento(finalEventId, fotoFile);
+                            // Actualizar la imagen en la lista inmediatamente
+                            const imgEl = document.getElementById(`img-${finalEventId}`);
+                            if (imgEl) {
+                                imgEl.src = uploadedUrl.startsWith('/') ? window.location.origin + uploadedUrl : uploadedUrl;
+                                // actualizar el texto de debug si existe
+                                const debugDiv = imgEl.nextElementSibling;
+                                if (debugDiv) debugDiv.textContent = uploadedUrl;
+                            }
+                            alerts.innerHTML = `<div class="alert alert-success">Evento y foto ${eventId ? 'actualizados' : 'creados'} correctamente</div>`;
+                        } catch (fotoError) {
+                            alerts.innerHTML = `<div class="alert alert-warning">Evento ${eventId ? 'actualizado' : 'creado'} correctamente, pero hubo un error al subir la foto: ${fotoError.message}</div>`;
+                        }
+                    } else {
+                        alerts.innerHTML = `<div class="alert alert-success">Evento ${eventId ? 'actualizado' : 'creado'} correctamente</div>`;
+                    }
+                    
                     hideEventModal();
                     await loadEventos();
-                    document.getElementById('eventos-alerts').innerHTML = 
-                        `<div class="alert alert-success">Evento ${eventId ? 'actualizado' : 'creado'} correctamente</div>`;
+                    document.getElementById('eventos-alerts').innerHTML = alerts.innerHTML;
                 } else {
                     const data = await response.json();
                     alerts.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
                 }
             } catch (error) {
-                alerts.innerHTML = `<div class="alert alert-error">Error de conexión</div>`;
+                alerts.innerHTML = `<div class="alert alert-error">Error de conexión: ${error.message}</div>`;
             } finally {
                 loading.style.display = 'none';
             }
         });
+
+        // Funcionalidad para preview de foto
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'event-foto') {
+                const file = e.target.files[0];
+                const preview = document.getElementById('foto-preview');
+                const previewImg = document.getElementById('foto-preview-img');
+                
+                if (file) {
+                    // Validar tamaño (5MB máximo)
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('La imagen es demasiado grande. El tamaño máximo es 5MB.');
+                        e.target.value = '';
+                        preview.style.display = 'none';
+                        return;
+                    }
+                    
+                    // Mostrar preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImg.src = e.target.result;
+                        preview.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    preview.style.display = 'none';
+                }
+            }
+        });
+
+        // Función para subir foto de evento
+        async function subirFotoEvento(eventoId, file) {
+            console.log('🔍 Iniciando subida de foto:', {
+                eventoId,
+                fileName: file.name,
+                fileSize: file.size,
+                fileType: file.type
+            });
+            
+            const formData = new FormData();
+            formData.append('foto', file);
+            
+            const uploadUrl = `/api/funerarias/${funerariaId}/eventos/${eventoId}/foto`;
+            console.log('📤 URL de subida:', uploadUrl);
+            
+            try {
+                const response = await Auth.authenticatedFetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('📡 Respuesta del servidor:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('✅ Foto subida exitosamente:', result);
+                    return result.fotoUrl;
+                } else {
+                    const errorText = await response.text();
+                    console.error('❌ Error del servidor:', errorText);
+                    throw new Error(errorText || 'Error al subir la foto');
+                }
+            } catch (error) {
+                console.error('💥 Error al subir foto:', error);
+                throw error;
+            }
+        }
 
         // Cargar eventos al iniciar
         loadEventos();

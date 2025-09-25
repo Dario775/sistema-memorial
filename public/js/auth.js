@@ -40,11 +40,17 @@ window.Auth = {
             throw new Error('No hay token de autenticación');
         }
 
+        // Si el body es un FormData (subida de archivos), NO establecer Content-Type manualmente
+        const isFormData = options && options.body && (typeof FormData !== 'undefined') && (options.body instanceof FormData);
+
         const headers = {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
             ...options.headers
         };
+
+        if (!isFormData) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         const response = await fetch(url, {
             ...options,

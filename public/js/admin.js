@@ -73,6 +73,14 @@ window.AdminDashboard = {
                         </div>
                         
                         <div class="form-group">
+                            <label class="form-label">Foto del Evento:</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <img id="event-foto-preview" src="" alt="Vista previa" style="width: 100px; height: 100px; object-fit: cover; border-radius: 50%; display: none;">
+                                <input type="file" id="event-foto" class="form-control" accept="image/*" onchange="AdminDashboard.previewFoto(event)">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
                             <label style="display: flex; align-items: center; gap: 10px;">
                                 <input type="checkbox" id="event-activo" checked>
                                 <span>Evento activo</span>
@@ -131,6 +139,7 @@ window.AdminDashboard = {
         const eventosHtml = this.eventos.map(evento => `
             <div class="card" style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: between; align-items: flex-start; gap: 20px;">
+                    <img src="${evento.fotoUrl && evento.fotoUrl.startsWith('/') ? (window.location.origin + evento.fotoUrl) : (evento.fotoUrl || 'https://via.placeholder.com/100?text=Foto')}" alt="${evento.nombre}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 50%; border: 3px solid var(--primary-color);" onerror="this.onerror=null;this.src='https://via.placeholder.com/100?text=Foto';">
                     <div style="flex: 1;">
                         <h4>${evento.nombre}</h4>
                         <p style="color: var(--text-secondary); margin: 5px 0;">${evento.displayPhrase}</p>
@@ -215,6 +224,44 @@ window.AdminDashboard = {
         }
     },
 
+    previewFoto(event) {
+        const preview = document.getElementById('event-foto-preview');
+        const file = event.target.files[0];
+        if (file) {
+            preview.style.display = 'block';
+            preview.src = URL.createObjectURL(file);
+        } else {
+            preview.style.display = 'none';
+            preview.src = '';
+        }
+    },
+
+    async uploadFoto(eventoId, file) {
+        const formData = new FormData();
+        formData.append('foto', file);
+        
+        try {
+            const response = await Auth.authenticatedFetch(
+                `/api/funerarias/${this.currentFunerariaId}/eventos/${eventoId}/foto`,
+                {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        // No incluir Content-Type, fetch lo establecerá automáticamente con el boundary correcto
+                        'Authorization': `Bearer ${Auth.getToken()}`
+                    }
+                }
+            );
+            
+            if (!response.ok) throw new Error('Error al subir la foto');
+            const data = await response.json();
+            return data.fotoUrl;
+        } catch (error) {
+            console.error('Error al subir foto:', error);
+            throw error;
+        }
+    },
+
     initEventForm() {
         const form = document.getElementById('event-form');
         form.addEventListener('submit', async (e) => {
@@ -250,6 +297,18 @@ window.AdminDashboard = {
                 });
                 
                 if (response.ok) {
+                    const data = await response.json();
+                    // Si hay una foto nueva, subirla
+                    const fotoInput = document.getElementById('event-foto');
+                    if (fotoInput.files.length > 0) {
+                        try {
+                            await this.uploadFoto(data.id || eventId, fotoInput.files[0]);
+                        } catch (error) {
+                            console.error('Error al subir foto:', error);
+                            // Continuar incluso si la foto falla
+                        }
+                    }
+                    
                     this.hideEventModal();
                     await this.loadEventos();
                     document.getElementById('eventos-alerts').innerHTML = 

@@ -12,6 +12,8 @@ const path = require('path');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const fs = require('fs');
 console.log('📦 Librerías cargadas correctamente');
 
 // 2. INICIALIZACIÓN
@@ -36,8 +38,42 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
   console.warn('⚠️  Configura JWT_SECRET como variable de entorno para mayor seguridad.');
 }
 
-// Middleware para parsear JSON
-app.use(express.json());
+// Middleware para parsear JSON con límite aumentado para fotos
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Configuración de multer para subida de fotos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, 'public', 'uploads');
+    // Crear directorio si no existe
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Generar nombre único para el archivo
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const extension = path.extname(file.originalname);
+    cb(null, 'foto-' + uniqueSuffix + extension);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB máximo
+  },
+  fileFilter: function (req, file, cb) {
+    // Verificar que sea una imagen
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos de imagen'), false);
+    }
+  }
+});
 
 // --- NUEVO: Estructura para manejar múltiples funerarias y eventos ---
 // En una aplicación real, esto estaría en una base de datos.
@@ -55,7 +91,8 @@ const funerariasData = {
         displayPhrase: "Con amor, te recordaremos siempre.",
         youtubeVideoId: 'dQw4w9WgXcQ', // Video de prueba que sabemos que funciona
         fechaCreacion: new Date(),
-        activo: true
+        activo: true,
+        fotoUrl: 'https://randomuser.me/api/portraits/men/32.jpg'
       },
       'evento-2': {
         id: 'evento-2',
@@ -64,7 +101,8 @@ const funerariasData = {
         displayPhrase: "Tu luz brillará eternamente en nuestros corazones.",
         youtubeVideoId: 'yXl2i_6a-m0',
         fechaCreacion: new Date(),
-        activo: true
+        activo: true,
+        fotoUrl: 'https://randomuser.me/api/portraits/women/44.jpg'
       },
       'evento-17': {
         id: 'evento-17',
@@ -73,7 +111,8 @@ const funerariasData = {
         displayPhrase: "Un mensaje de amor eterno.",
         youtubeVideoId: 'LXb3EKWsInQ',
         fechaCreacion: new Date(),
-        activo: true
+        activo: true,
+        fotoUrl: 'https://randomuser.me/api/portraits/men/75.jpg'
       }
     }
   }
@@ -281,7 +320,8 @@ app.post('/api/funerarias/:funerariaId/eventos', authenticateToken, (req, res) =
     displayPhrase,
     youtubeVideoId,
     fechaCreacion: new Date(),
-    activo: true
+    activo: true,
+    fotoUrl: 'https://randomuser.me/api/portraits/' + (Math.random() > 0.5 ? 'men/' : 'women/') + Math.floor(Math.random() * 99) + '.jpg'
   };
   
   res.status(201).json(funeraria.eventos[eventoId]);
@@ -332,6 +372,16 @@ app.delete('/api/funerarias/:funerariaId/eventos/:eventoId', authenticateToken, 
     return res.status(404).json({ error: 'Evento no encontrado' });
   }
   
+  // Eliminar foto si existe
+  const evento = funeraria.eventos[eventoId];
+  if (evento.fotoUrl) {
+    const fotoPath = path.join(__dirname, 'public', evento.fotoUrl);
+    if (fs.existsSync(fotoPath)) {
+      fs.unlinkSync(fotoPath);
+      console.log(`📸 Foto eliminada: ${fotoPath}`);
+    }
+  }
+  
   // Eliminar evento
   delete funeraria.eventos[eventoId];
   
@@ -339,6 +389,46 @@ app.delete('/api/funerarias/:funerariaId/eventos/:eventoId', authenticateToken, 
   io.to(eventoId).emit('event deleted', { message: 'Este evento ha sido eliminado por el administrador' });
   
   res.json({ message: 'Evento eliminado exitosamente' });
+});
+
+// Endpoint para subir foto de evento
+app.post('/api/funerarias/:funerariaId/eventos/:eventoId/foto', authenticateToken, upload.single('foto'), (req, res) => {
+  const { funerariaId, eventoId } = req.params;
+  
+  // Verificar permisos
+  if (req.user.funerariaId !== funerariaId) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+  
+  const funeraria = funerariasData[funerariaId];
+  if (!funeraria || !funeraria.eventos[eventoId]) {
+    return res.status(404).json({ error: 'Evento no encontrado' });
+  }
+  
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se subió ningún archivo' });
+  }
+  
+  // Eliminar foto anterior si existe
+  const evento = funeraria.eventos[eventoId];
+  if (evento.fotoUrl) {
+    const fotoAnteriorPath = path.join(__dirname, 'public', evento.fotoUrl);
+    if (fs.existsSync(fotoAnteriorPath)) {
+      fs.unlinkSync(fotoAnteriorPath);
+      console.log(`📸 Foto anterior eliminada: ${fotoAnteriorPath}`);
+    }
+  }
+  
+  // Actualizar evento con nueva foto
+  const fotoUrl = `/uploads/${req.file.filename}`;
+  evento.fotoUrl = fotoUrl;
+  
+  console.log(`📸 Nueva foto subida para evento ${eventoId}: ${fotoUrl}`);
+  
+  res.json({
+    message: 'Foto subida exitosamente',
+    fotoUrl: fotoUrl
+  });
 });
 
 // 5. LÓGICA DE SOCKET.IO (La magia del chat en tiempo real)
