@@ -7,7 +7,9 @@ import {
     signOut, 
     onAuthStateChanged,
     sendPasswordResetEmail,
-    updateProfile
+    updateProfile,
+    GoogleAuthProvider,
+    signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
     getFirestore, 
@@ -169,6 +171,49 @@ class FirebaseAuth {
     getFuneraria() {
         const funerariaData = localStorage.getItem('funeraria');
         return funerariaData ? JSON.parse(funerariaData) : null;
+    }
+
+    // Iniciar sesión con Google
+    async loginWithGoogle() {
+        try {
+            console.log('🔐 Iniciando sesión con Google...');
+            
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            
+            console.log('✅ Sesión iniciada con Google:', user.email);
+
+            // Verificar si es la primera vez que se registra
+            const funerariaDoc = await getDoc(doc(db, 'funerarias', user.uid));
+            
+            if (!funerariaDoc.exists()) {
+                // Primera vez, crear perfil en Firestore
+                await setDoc(doc(db, 'funerarias', user.uid), {
+                    nombre: user.displayName || 'Funeraria',
+                    email: user.email,
+                    telefono: '',
+                    direccion: '',
+                    fechaCreacion: new Date().toISOString(),
+                    activo: true,
+                    provider: 'google'
+                });
+                console.log('✅ Perfil de Google creado en Firestore');
+            }
+
+            return {
+                success: true,
+                user: user,
+                message: 'Inicio de sesión con Google exitoso'
+            };
+        } catch (error) {
+            console.error('❌ Error en login con Google:', error);
+            return {
+                success: false,
+                error: this.getErrorMessage(error.code),
+                code: error.code
+            };
+        }
     }
 
     // Recuperar contraseña
