@@ -5,6 +5,65 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iniciar Sesión - Sistema Memorial</title>
     <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .form-container {
+            max-width: 450px;
+            margin: 50px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .logo-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo-section h1 {
+            color: var(--primary-color);
+            margin: 10px 0;
+            font-size: 28px;
+        }
+        
+        .forgot-password {
+            text-align: right;
+            margin-top: 10px;
+        }
+        
+        .forgot-password a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .forgot-password a:hover {
+            text-decoration: underline;
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+        
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--border-color);
+        }
+        
+        .divider span {
+            background: white;
+            padding: 0 15px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -20,78 +79,132 @@
         </div>
     </div>
     
-    <div class="container" style="margin-top: 40px;">
-        <div class="card" style="max-width: 400px; margin: 0 auto;">
-            <h2 style="text-align: center; margin-bottom: 30px;">Iniciar Sesión</h2>
-            
-            <div id="login-alerts"></div>
-            
-            <form id="login-form">
-                <div class="form-group">
-                    <label class="form-label">Email:</label>
-                    <input type="email" id="login-email" class="form-control" required>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Contraseña:</label>
-                    <input type="password" id="login-password" class="form-control" required>
-                </div>
-                
-                <button type="submit" class="btn btn-primary" style="width: 100%;">
-                    <span id="login-loading" class="loading" style="display: none;"></span>
-                    Iniciar Sesión
-                </button>
-            </form>
-            
-            <div style="text-align: center; margin-top: 20px;">
-                <p>¿No tienes cuenta? <a href="/registro.html">Registra tu funeraria</a></p>
+    <div class="form-container">
+        <div class="logo-section">
+            <div style="font-size: 48px;">🕯️</div>
+            <h1>Sistema Memorial</h1>
+            <p>Iniciar Sesión</p>
+        </div>
+        
+        <div id="login-alerts"></div>
+        
+        <form id="login-form">
+            <div class="form-group">
+                <label class="form-label">Correo Electrónico</label>
+                <input type="email" id="login-email" class="form-control" required 
+                       placeholder="contacto@funeraria.com">
             </div>
             
-            <div style="margin-top: 30px; padding: 15px; background-color: var(--background-light); border-radius: 6px;">
-                <strong>Demostración:</strong><br>
-                Email: admin@demo.com<br>
-                Contraseña: demo123
+            <div class="form-group">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="login-password" class="form-control" required 
+                       placeholder="Tu contraseña">
+                <div class="forgot-password">
+                    <a href="#" id="forgot-password-link">¿Olvidaste tu contraseña?</a>
+                </div>
             </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <span id="login-loading" class="loading" style="display: none;"></span>
+                <span id="login-text">Iniciar Sesión</span>
+            </button>
+        </form>
+        
+        <div class="divider">
+            <span>o</span>
+        </div>
+        
+        <div style="text-align: center;">
+            <p>¿No tienes cuenta? <a href="/registro.html">Crear cuenta</a></p>
         </div>
     </div>
 
-    <script src="/js/auth.js"></script>
-    <script>
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const loading = document.getElementById('login-loading');
-            const alerts = document.getElementById('login-alerts');
-            
-            loading.style.display = 'inline-block';
-            alerts.innerHTML = '';
-            
-            try {
-                const response = await fetch('/api/funerarias/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('funeraria', JSON.stringify(data.funeraria));
-                    window.location.href = `/dashboard.html?id=${data.funeraria.id}`;
-                } else {
-                    alerts.innerHTML = `<div class="alert alert-error">${data.error}</div>`;
-                }
-            } catch (error) {
-                alerts.innerHTML = `<div class="alert alert-error">Error de conexión</div>`;
-            } finally {
-                loading.style.display = 'none';
-            }
+    <script type="module" src="/js/firebase-config.js"></script>
+    <script type="module">
+        window.addEventListener('load', () => {
+            setTimeout(initializeLogin, 100);
         });
+
+        function initializeLogin() {
+            const form = document.getElementById('login-form');
+            const alerts = document.getElementById('login-alerts');
+            const loading = document.getElementById('login-loading');
+            const loginText = document.getElementById('login-text');
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const forgotPasswordLink = document.getElementById('forgot-password-link');
+
+            // Manejar inicio de sesión
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+
+                alerts.innerHTML = '';
+
+                if (!email || !password) {
+                    alerts.innerHTML = `<div class="alert alert-error">Por favor completa todos los campos</div>`;
+                    return;
+                }
+
+                loading.style.display = 'inline-block';
+                loginText.textContent = 'Iniciando sesión...';
+                submitBtn.disabled = true;
+
+                try {
+                    const result = await window.FirebaseAuth.login(email, password);
+
+                    if (result.success) {
+                        alerts.innerHTML = `<div class="alert alert-success">¡Bienvenido! Redirigiendo...</div>`;
+                        form.reset();
+                        setTimeout(() => {
+                            window.location.href = `/dashboard.html?id=${result.user.uid}`;
+                        }, 1500);
+                    } else {
+                        alerts.innerHTML = `<div class="alert alert-error">${result.error}</div>`;
+                    }
+                } catch (error) {
+                    console.error('Error en login:', error);
+                    alerts.innerHTML = `<div class="alert alert-error">Error de conexión. Por favor intenta nuevamente.</div>`;
+                } finally {
+                    loading.style.display = 'none';
+                    loginText.textContent = 'Iniciar Sesión';
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // Manejar recuperación de contraseña
+            forgotPasswordLink.addEventListener('click', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('login-email').value.trim();
+                
+                if (!email) {
+                    alerts.innerHTML = `<div class="alert alert-error">Por favor ingresa tu correo electrónico primero</div>`;
+                    return;
+                }
+
+                try {
+                    const result = await window.FirebaseAuth.resetPassword(email);
+                    
+                    if (result.success) {
+                        alerts.innerHTML = `<div class="alert alert-success">${result.message}</div>`;
+                    } else {
+                        alerts.innerHTML = `<div class="alert alert-error">${result.error}</div>`;
+                    }
+                } catch (error) {
+                    alerts.innerHTML = `<div class="alert alert-error">Error al enviar correo de recuperación</div>`;
+                }
+            });
+
+            // Verificar si ya está autenticado
+            if (window.FirebaseAuth && window.FirebaseAuth.isAuthenticated()) {
+                const user = window.FirebaseAuth.getCurrentUser();
+                if (user) {
+                    window.location.href = `/dashboard.html?id=${user.uid}`;
+                }
+            }
+        }
     </script>
 </body>
 </html>

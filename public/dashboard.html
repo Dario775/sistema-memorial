@@ -11,20 +11,28 @@
         <!-- El contenido se cargará dinámicamente -->
     </div>
 
-    <script src="/js/auth.js"></script>
-    <script>
-        // Verificar autenticación
-        if (!Auth.isAuthenticated()) {
-            window.location.href = '/admin.html';
-        }
+    <script type="module" src="/js/firebase-config.js"></script>
+    <script type="module">
+        // Esperar a que Firebase esté listo
+        window.addEventListener('load', () => {
+            setTimeout(initializeDashboard, 100);
+        });
 
-        const funeraria = Auth.getFuneraria();
-        const urlParams = new URLSearchParams(window.location.search);
-        const funerariaId = urlParams.get('id');
+        function initializeDashboard() {
+            // Verificar autenticación
+            if (!window.FirebaseAuth.isAuthenticated()) {
+                window.location.href = '/admin.html';
+                return;
+            }
 
-        if (!funerariaId || (funeraria && funeraria.id !== funerariaId)) {
-            window.location.href = '/admin.html';
-        }
+            const funeraria = window.FirebaseAuth.getFuneraria();
+            const urlParams = new URLSearchParams(window.location.search);
+            const funerariaId = urlParams.get('id');
+
+            if (!funerariaId || (funeraria && funeraria.id !== funerariaId)) {
+                window.location.href = '/admin.html';
+                return;
+            }
 
         // Cargar el dashboard
         document.getElementById('app').innerHTML = `
@@ -121,7 +129,7 @@
 
         // Funciones del dashboard
         function logout() {
-            Auth.logout();
+            window.FirebaseAuth.logout();
             window.location.href = '/admin.html';
         }
 
@@ -133,8 +141,8 @@
             alerts.innerHTML = '';
             
             try {
-                const response = await Auth.authenticatedFetch(`/api/funerarias/${funerariaId}/eventos`);
-                eventos = await response.json();
+                // Por ahora usar Firebase para obtener eventos
+                const eventos = await window.FirebaseAuth.getEventos();
                 renderEventos();
             } catch (error) {
                 alerts.innerHTML = `<div class="alert alert-error">Error al cargar eventos: ${error.message}</div>`;
@@ -163,7 +171,6 @@
                             <img id="img-${evento.id}" src="${evento.fotoUrl ? (evento.fotoUrl.startsWith('/') ? window.location.origin + evento.fotoUrl : evento.fotoUrl) : 'https://via.placeholder.com/120?text=Foto'}" alt="Foto de ${evento.nombre}" 
                                  style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 2px solid var(--border-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
                                  onerror="this.onerror=null;this.src='https://via.placeholder.com/120?text=Foto';">
-                            <div style="font-size:12px; color:#666; margin-top:6px; max-width:120px; word-break:break-all;">${evento.fotoUrl || 'no-foto'}</div>
                         </div>
                         
                         <div style="flex: 1;">
@@ -391,9 +398,6 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
                             const imgEl = document.getElementById(`img-${finalEventId}`);
                             if (imgEl) {
                                 imgEl.src = uploadedUrl.startsWith('/') ? window.location.origin + uploadedUrl : uploadedUrl;
-                                // actualizar el texto de debug si existe
-                                const debugDiv = imgEl.nextElementSibling;
-                                if (debugDiv) debugDiv.textContent = uploadedUrl;
                             }
                             alerts.innerHTML = `<div class="alert alert-success">Evento y foto ${eventId ? 'actualizados' : 'creados'} correctamente</div>`;
                         } catch (fotoError) {
@@ -490,6 +494,17 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
 
         // Cargar eventos al iniciar
         loadEventos();
+        
+        // Hacer las funciones globales para que funcionen con onclick
+        window.logout = logout;
+        window.showCreateEventModal = showCreateEventModal;
+        window.editEvento = editEvento;
+        window.hideEventModal = hideEventModal;
+        window.toggleEvento = toggleEvento;
+        window.copyLink = copyLink;
+        window.shareWhatsApp = shareWhatsApp;
+        window.eliminarEvento = eliminarEvento;
+        }
     </script>
 </body>
 </html>
