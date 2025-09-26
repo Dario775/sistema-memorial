@@ -1,0 +1,294 @@
+// Configuración de Firebase
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { 
+    getAuth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    updateProfile
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { 
+    getFirestore, 
+    doc, 
+    setDoc, 
+    getDoc, 
+    collection, 
+    addDoc, 
+    query, 
+    where, 
+    getDocs,
+    updateDoc,
+    deleteDoc
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+// Configuración de Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDDSrpqYvrg7SH72vuBMtm5B5Je06S-sp0",
+  authDomain: "memorial-10fcc.firebaseapp.com",
+  projectId: "memorial-10fcc",
+  storageBucket: "memorial-10fcc.firebasestorage.app",
+  messagingSenderId: "146305941295",
+  appId: "1:146305941295:web:d5cb632431e317dddd6bda"
+};
+
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Clase para manejar la autenticación con Firebase
+class FirebaseAuth {
+    constructor() {
+        this.currentUser = null;
+        this.initAuthStateListener();
+    }
+
+    // Escuchar cambios en el estado de autenticación
+    initAuthStateListener() {
+        onAuthStateChanged(auth, (user) => {
+            this.currentUser = user;
+            if (user) {
+                console.log('Usuario autenticado:', user.email);
+                // Guardar datos del usuario en localStorage para compatibilidad
+                localStorage.setItem('funeraria', JSON.stringify({
+                    id: user.uid,
+                    email: user.email,
+                    nombre: user.displayName || 'Funeraria',
+                    token: user.accessToken
+                }));
+            } else {
+                console.log('Usuario no autenticado');
+                localStorage.removeItem('funeraria');
+            }
+        });
+    }
+
+    // Registrar nuevo usuario
+    async register(email, password, funerariaData) {
+        try {
+            console.log('🔐 Iniciando registro con Firebase...');
+            
+            // Crear usuario en Firebase Auth
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            console.log('✅ Usuario creado en Firebase Auth:', user.uid);
+
+            // Actualizar perfil del usuario
+            await updateProfile(user, {
+                displayName: funerariaData.nombre
+            });
+
+            // Guardar datos adicionales en Firestore
+            await setDoc(doc(db, 'funerarias', user.uid), {
+                nombre: funerariaData.nombre,
+                email: email,
+                telefono: funerariaData.telefono || '',
+                direccion: funerariaData.direccion || '',
+                fechaCreacion: new Date().toISOString(),
+                activo: true
+            });
+
+            console.log('✅ Datos de funeraria guardados en Firestore');
+
+            return {
+                success: true,
+                user: user,
+                message: 'Registro exitoso'
+            };
+        } catch (error) {
+            console.error('❌ Error en registro:', error);
+            return {
+                success: false,
+                error: this.getErrorMessage(error.code),
+                code: error.code
+            };
+        }
+    }
+
+    // Iniciar sesión
+    async login(email, password) {
+        try {
+            console.log('🔐 Iniciando sesión con Firebase...');
+            
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+            
+            console.log('✅ Sesión iniciada:', user.email);
+
+            // Obtener datos adicionales de Firestore
+            const funerariaDoc = await getDoc(doc(db, 'funerarias', user.uid));
+            let funerariaData = {};
+            
+            if (funerariaDoc.exists()) {
+                funerariaData = funerariaDoc.data();
+            }
+
+            return {
+                success: true,
+                user: user,
+                funerariaData: funerariaData,
+                message: 'Inicio de sesión exitoso'
+            };
+        } catch (error) {
+            console.error('❌ Error en login:', error);
+            return {
+                success: false,
+                error: this.getErrorMessage(error.code),
+                code: error.code
+            };
+        }
+    }
+
+    // Cerrar sesión
+    async logout() {
+        try {
+            await signOut(auth);
+            localStorage.removeItem('funeraria');
+            console.log('✅ Sesión cerrada');
+            return { success: true };
+        } catch (error) {
+            console.error('❌ Error al cerrar sesión:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    // Verificar si el usuario está autenticado
+    isAuthenticated() {
+        return this.currentUser !== null;
+    }
+
+    // Obtener usuario actual
+    getCurrentUser() {
+        return this.currentUser;
+    }
+
+    // Obtener datos de la funeraria desde localStorage (compatibilidad)
+    getFuneraria() {
+        const funerariaData = localStorage.getItem('funeraria');
+        return funerariaData ? JSON.parse(funerariaData) : null;
+    }
+
+    // Recuperar contraseña
+    async resetPassword(email) {
+        try {
+            await sendPasswordResetEmail(auth, email);
+            return {
+                success: true,
+                message: 'Se ha enviado un correo para restablecer tu contraseña'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: this.getErrorMessage(error.code)
+            };
+        }
+    }
+
+    // Realizar peticiones autenticadas (compatibilidad con el sistema actual)
+    async authenticatedFetch(url, options = {}) {
+        if (!this.currentUser) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        // Obtener token de Firebase
+        const token = await this.currentUser.getIdToken();
+        
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            ...options.headers
+        };
+
+        return fetch(url, {
+            ...options,
+            headers
+        });
+    }
+
+    // Traducir códigos de error de Firebase a mensajes amigables
+    getErrorMessage(errorCode) {
+        const errorMessages = {
+            'auth/email-already-in-use': 'Este correo electrónico ya está registrado',
+            'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+            'auth/invalid-email': 'El correo electrónico no es válido',
+            'auth/user-not-found': 'No existe una cuenta con este correo electrónico',
+            'auth/wrong-password': 'Contraseña incorrecta',
+            'auth/too-many-requests': 'Demasiados intentos fallidos. Intenta más tarde',
+            'auth/network-request-failed': 'Error de conexión. Verifica tu internet',
+            'auth/invalid-credential': 'Credenciales inválidas. Verifica tu email y contraseña',
+            'auth/user-disabled': 'Esta cuenta ha sido deshabilitada',
+            'auth/operation-not-allowed': 'Operación no permitida'
+        };
+
+        return errorMessages[errorCode] || 'Ha ocurrido un error inesperado';
+    }
+
+    // Métodos para manejar eventos (compatibilidad con sistema actual)
+    async createEvento(eventoData) {
+        if (!this.currentUser) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        try {
+            const docRef = await addDoc(collection(db, 'eventos'), {
+                ...eventoData,
+                funerariaId: this.currentUser.uid,
+                fechaCreacion: new Date().toISOString(),
+                activo: true,
+                accessCode: this.generateAccessCode()
+            });
+
+            return {
+                success: true,
+                id: docRef.id,
+                ...eventoData
+            };
+        } catch (error) {
+            console.error('Error creando evento:', error);
+            throw error;
+        }
+    }
+
+    async getEventos() {
+        if (!this.currentUser) {
+            throw new Error('Usuario no autenticado');
+        }
+
+        try {
+            const q = query(
+                collection(db, 'eventos'), 
+                where('funerariaId', '==', this.currentUser.uid)
+            );
+            const querySnapshot = await getDocs(q);
+            
+            const eventos = [];
+            querySnapshot.forEach((doc) => {
+                eventos.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+
+            return eventos;
+        } catch (error) {
+            console.error('Error obteniendo eventos:', error);
+            throw error;
+        }
+    }
+
+    // Generar código de acceso para eventos
+    generateAccessCode() {
+        return Math.floor(1000 + Math.random() * 9000).toString();
+    }
+}
+
+// Crear instancia global
+window.FirebaseAuth = new FirebaseAuth();
+
+// Exportar para compatibilidad
+window.Auth = window.FirebaseAuth;
+
+console.log('🔥 Firebase Authentication configurado correctamente');
