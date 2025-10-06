@@ -19,12 +19,29 @@
         });
 
         function initializeDashboard() {
-            // Verificar autenticación
-            if (!window.FirebaseAuth.isAuthenticated()) {
-                window.location.href = '/admin.html';
+            if (!window.FirebaseAuth) {
+                setTimeout(initializeDashboard, 100);
                 return;
             }
 
+            // Verificar autenticación
+            if (!window.FirebaseAuth.isAuthenticated()) {
+                // Wait a bit for auth state to settle
+                setTimeout(() => {
+                    if (!window.FirebaseAuth.isAuthenticated()) {
+                        window.location.href = '/admin.html';
+                        return;
+                    }
+                    // Continue with auth check
+                    proceedWithDashboard();
+                }, 1000);
+                return;
+            }
+
+            proceedWithDashboard();
+        }
+
+        function proceedWithDashboard() {
             const funeraria = window.FirebaseAuth.getFuneraria();
             const urlParams = new URLSearchParams(window.location.search);
             const funerariaId = urlParams.get('id');
@@ -265,7 +282,7 @@
 
         async function toggleEvento(eventoId, newStatus) {
             try {
-                const response = await Auth.authenticatedFetch(
+                const response = await window.FirebaseAuth.authenticatedFetch(
                     `/api/funerarias/${funerariaId}/eventos/${eventoId}`,
                     {
                         method: 'PUT',
@@ -334,7 +351,7 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
             if (!confirmacion) return;
             
             try {
-                const response = await Auth.authenticatedFetch(`/api/funerarias/${funerariaId}/eventos/${eventoId}`, {
+                const response = await window.FirebaseAuth.authenticatedFetch(`/api/funerarias/${funerariaId}/eventos/${eventoId}`, {
                     method: 'DELETE'
                 });
                 
@@ -376,7 +393,7 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
                 
                 const method = eventId ? 'PUT' : 'POST';
                 
-                const response = await Auth.authenticatedFetch(url, {
+                const response = await window.FirebaseAuth.authenticatedFetch(url, {
                     method,
                     body: JSON.stringify({
                         nombre,
@@ -466,7 +483,7 @@ Esta acción no se puede deshacer y todos los datos del evento se perderán perm
             console.log('📤 URL de subida:', uploadUrl);
             
             try {
-                const response = await Auth.authenticatedFetch(uploadUrl, {
+                const response = await window.FirebaseAuth.authenticatedFetch(uploadUrl, {
                     method: 'POST',
                     body: formData
                 });

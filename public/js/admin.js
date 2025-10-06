@@ -10,7 +10,7 @@ window.AdminDashboard = {
     },
 
     render() {
-        const funeraria = Auth.getFuneraria();
+        const funeraria = window.FirebaseAuth.getFuneraria();
         const container = document.getElementById('admin-dashboard');
         
         container.innerHTML = `
@@ -21,7 +21,7 @@ window.AdminDashboard = {
                         <nav>
                             <ul class="nav-links">
                                 <li><a href="/">Inicio</a></li>
-                                <li><a href="#" onclick="Auth.logout()">Cerrar Sesión</a></li>
+                                <li><a href="#" onclick="window.FirebaseAuth.logout()">Cerrar Sesión</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -111,7 +111,7 @@ window.AdminDashboard = {
         alerts.innerHTML = '';
         
         try {
-            const response = await Auth.authenticatedFetch(`/api/funerarias/${this.currentFunerariaId}/eventos`);
+            const response = await window.FirebaseAuth.authenticatedFetch(`/api/funerarias/${this.currentFunerariaId}/eventos`);
             const eventos = await response.json();
             
             this.eventos = eventos;
@@ -205,7 +205,7 @@ window.AdminDashboard = {
 
     async toggleEvento(eventoId, newStatus) {
         try {
-            const response = await Auth.authenticatedFetch(
+            const response = await window.FirebaseAuth.authenticatedFetch(
                 `/api/funerarias/${this.currentFunerariaId}/eventos/${eventoId}`,
                 {
                     method: 'PUT',
@@ -241,14 +241,14 @@ window.AdminDashboard = {
         formData.append('foto', file);
         
         try {
-            const response = await Auth.authenticatedFetch(
+            const response = await window.FirebaseAuth.authenticatedFetch(
                 `/api/funerarias/${this.currentFunerariaId}/eventos/${eventoId}/foto`,
                 {
                     method: 'POST',
                     body: formData,
                     headers: {
                         // No incluir Content-Type, fetch lo establecerá automáticamente con el boundary correcto
-                        'Authorization': `Bearer ${Auth.getToken()}`
+                        'Authorization': `Bearer ${(await window.FirebaseAuth.getCurrentUser().getIdToken())}`
                     }
                 }
             );
@@ -286,7 +286,7 @@ window.AdminDashboard = {
                 
                 const method = eventId ? 'PUT' : 'POST';
                 
-                const response = await Auth.authenticatedFetch(url, {
+                const response = await window.FirebaseAuth.authenticatedFetch(url, {
                     method,
                     body: JSON.stringify({
                         nombre,

@@ -7,7 +7,9 @@ import {
     signOut, 
     onAuthStateChanged,
     sendPasswordResetEmail,
-    updateProfile
+    updateProfile,
+    GoogleAuthProvider,
+    signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
     getFirestore, 
@@ -112,32 +114,55 @@ class FirebaseAuth {
     async login(email, password) {
         try {
             console.log('🔐 Iniciando sesión con Firebase...');
+            console.log('Email usado:', email);
+            console.log('Contraseña longitud:', password.length);
             
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
             console.log('✅ Sesión iniciada:', user.email);
+            console.log('Email verificado:', user.emailVerified);
+            console.log('UID:', user.uid);
 
-            // Obtener datos adicionales de Firestore
-            const funerariaDoc = await getDoc(doc(db, 'funerarias', user.uid));
+            // Verificar si el email está verificado
+            if (!user.emailVerified) {
+                console.warn('⚠️ Email no verificado');
+                // No fallar el login, pero mostrar advertencia
+            }
+
+            // Obtener datos adicionales de Firestore (con manejo de errores)
             let funerariaData = {};
-            
-            if (funerariaDoc.exists()) {
-                funerariaData = funerariaDoc.data();
+            try {
+                const funerariaDoc = await getDoc(doc(db, 'funerarias', user.uid));
+                
+                if (funerariaDoc.exists()) {
+                    funerariaData = funerariaDoc.data();
+                    console.log('✅ Datos de funeraria encontrados en Firestore');
+                } else {
+                    console.warn('⚠️ No se encontraron datos de funeraria en Firestore');
+                }
+            } catch (firestoreError) {
+                console.warn('⚠️ Error al obtener datos de Firestore:', firestoreError.message);
+                console.log('📝 Continuando con login exitoso sin datos de Firestore');
+                // No fallar el login por error de Firestore
             }
 
             return {
                 success: true,
                 user: user,
+                emailVerified: user.emailVerified,
                 funerariaData: funerariaData,
                 message: 'Inicio de sesión exitoso'
             };
         } catch (error) {
-            console.error('❌ Error en login:', error);
+            console.error('❌ Error en login - Código:', error.code);
+            console.error('❌ Error en login - Mensaje completo:', error.message);
+            console.error('❌ Error en login - Email usado:', email);
             return {
                 success: false,
                 error: this.getErrorMessage(error.code),
-                code: error.code
+                code: error.code,
+                fullError: error.message
             };
         }
     }
@@ -171,6 +196,49 @@ class FirebaseAuth {
         return funerariaData ? JSON.parse(funerariaData) : null;
     }
 
+    // Iniciar sesión con Google
+    async loginWithGoogle() {
+        try {
+            console.log('🔐 Iniciando sesión con Google...');
+            
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            
+            console.log('✅ Sesión iniciada con Google:', user.email);
+
+            // Verificar si es la primera vez que se registra
+            const funerariaDoc = await getDoc(doc(db, 'funerarias', user.uid));
+            
+            if (!funerariaDoc.exists()) {
+                // Primera vez, crear perfil en Firestore
+                await setDoc(doc(db, 'funerarias', user.uid), {
+                    nombre: user.displayName || 'Funeraria',
+                    email: user.email,
+                    telefono: '',
+                    direccion: '',
+                    fechaCreacion: new Date().toISOString(),
+                    activo: true,
+                    provider: 'google'
+                });
+                console.log('✅ Perfil de Google creado en Firestore');
+            }
+
+            return {
+                success: true,
+                user: user,
+                message: 'Inicio de sesión con Google exitoso'
+            };
+        } catch (error) {
+            console.error('❌ Error en login con Google:', error);
+            return {
+                success: false,
+                error: this.getErrorMessage(error.code),
+                code: error.code
+            };
+        }
+    }
+
     // Recuperar contraseña
     async resetPassword(email) {
         try {
@@ -197,10 +265,14 @@ class FirebaseAuth {
         const token = await this.currentUser.getIdToken();
         
         const headers = {
-            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
             ...options.headers
         };
+
+        // Si el body es FormData, el navegador debe establecer el Content-Type
+        if (!(options.body instanceof FormData)) {
+            headers['Content-Type'] = 'application/json';
+        }
 
         return fetch(url, {
             ...options,
@@ -220,10 +292,14 @@ class FirebaseAuth {
             'auth/network-request-failed': 'Error de conexión. Verifica tu internet',
             'auth/invalid-credential': 'Credenciales inválidas. Verifica tu email y contraseña',
             'auth/user-disabled': 'Esta cuenta ha sido deshabilitada',
-            'auth/operation-not-allowed': 'Operación no permitida'
+            'auth/operation-not-allowed': 'Operación no permitida',
+            'auth/requires-recent-login': 'Por seguridad, inicia sesión nuevamente',
+            'auth/invalid-verification-code': 'Código de verificación inválido'
         };
 
-        return errorMessages[errorCode] || 'Ha ocurrido un error inesperado';
+        const message = errorMessages[errorCode] || 'Correo electrónico o contraseña incorrectos. Código de error: ' + errorCode;
+        console.log('📝 Mensaje de error mostrado al usuario:', message);
+        return message;
     }
 
     // Métodos para manejar eventos (compatibilidad con sistema actual)

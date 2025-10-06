@@ -267,7 +267,7 @@ window.EventoPage = {
         const loading = document.getElementById('access-loading');
         const btnText = document.getElementById('btn-text');
         const alerts = document.getElementById('access-alerts');
-
+    
         if (!fullName) {
             alerts.innerHTML = '<div class="alert alert-error">Por favor ingresa tu nombre y apellido</div>';
             return;
@@ -280,71 +280,81 @@ window.EventoPage = {
             alerts.innerHTML = '<div class="alert alert-error">El código debe tener exactamente 4 dígitos</div>';
             return;
         }
-
+    
         loading.style.display = 'inline-block';
         btnText.textContent = 'Verificando...';
         alerts.innerHTML = '';
-
+    
         this.fullName = fullName;
-        // Derivar nombre y apellido (opcional) para el servidor
         const [firstName, ...rest] = fullName.split(' ');
         const lastName = rest.join(' ').trim();
-
+    
         console.log(`🔐 Validando acceso para: "${this.fullName}" con código: "${code}" para evento: "${this.eventoId}"`);
-
+    
         const timeout = setTimeout(() => {
             loading.style.display = 'none';
             btnText.textContent = 'Ingresar al Memorial';
             alerts.innerHTML = '<div class="alert alert-error">Tiempo de espera agotado. Verifica tu conexión e intenta nuevamente.</div>';
         }, 10000);
-
-        this.socket.emit('validate code', {
-            code,
-            eventId: this.eventoId,
-            firstName: firstName || fullName,
-            lastName,
-            fullName: this.fullName
-        }, (response) => {
+    
+        const token = localStorage.getItem('authToken'); // Obtener el token almacenado
+    
+        try {
+            const response = await fetch(`/api/eventos/${this.eventoId}/validate-access`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    code,
+                    firstName: firstName || fullName,
+                    lastName,
+                    fullName: this.fullName
+                })
+            });
+    
             clearTimeout(timeout);
             loading.style.display = 'none';
             btnText.textContent = 'Ingresar al Memorial';
-
-            if (response.status === 'ok') {
+    
+            if (response.ok) {
+                const data = await response.json();
                 this.isAuthenticated = true;
-
-                if (response.eventId && response.eventId !== this.eventoId) {
-                    this.eventoId = response.eventId;
+    
+                if (data.eventId && data.eventId !== this.eventoId) {
+                    this.eventoId = data.eventId;
                     if (window.history && window.history.replaceState) {
-                        window.history.replaceState(null, null, `/evento/${response.eventId}`);
+                        window.history.replaceState(null, null, `/evento/${data.eventId}`);
                     }
                 }
-
+    
                 const overlay = document.getElementById('access-overlay');
                 const bg = document.getElementById('background-content');
                 overlay.style.opacity = '0';
                 bg.classList.add('authenticated');
                 setTimeout(() => { overlay.style.display = 'none'; }, 400);
-
-                // Si por alguna razón no nos unimos antes, unirnos ahora
+    
                 if (!this.roomJoined) {
                     this.socket.emit('join room', this.eventoId);
                     this.roomJoined = true;
                 }
-                // Establecer automáticamente el nombre del chat con el del modal
                 this.setUsername(this.fullName);
             } else {
+                const errorData = await response.json();
                 alerts.innerHTML = `
                     <div class="alert alert-error">
-                        <strong>Código de acceso inválido</strong><br>
+                        <strong>${errorData.error || 'Error de autenticación'}</strong><br>
                         Verifica que el código sea correcto y que el evento esté activo.
-                        <br><br>
-                        <small>Códigos de demo disponibles: 1234, 5678</small>
                     </div>
                 `;
             }
-        });
-    },
-
+        } catch (error) {
+            console.error('Error al validar el acceso:', error);
+            alerts.innerHTML = '<div class="alert alert-error">Error al conectar con el servidor. Intenta nuevamente.</div>';
+        }
+    }
+    
     setUsername(name) {
         const username = (name ? name : (document.getElementById('username-input')?.value || '')).trim();
         if (!username) return;
