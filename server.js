@@ -184,20 +184,23 @@ function findEventoByCode(accessCode) {
 
 // Middleware de autenticación
 function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Token de acceso requerido' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Token inválido' });
+    if (!token) {
+        console.log('❌ Token no proporcionado');
+        return res.status(401).json({ error: 'Token de acceso requerido' });
     }
-    req.user = user;
-    next();
-  });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            console.log('❌ Error al verificar el token:', err.message);
+            return res.status(403).json({ error: 'Token inválido' });
+        }
+        console.log('✅ Token verificado correctamente para el usuario:', user);
+        req.user = user;
+        next();
+    });
 }
 
 // 3. ARCHIVOS ESTÁTICOS
@@ -389,6 +392,28 @@ app.delete('/api/funerarias/:funerariaId/eventos/:eventoId', authenticateToken, 
   io.to(eventoId).emit('event deleted', { message: 'Este evento ha sido eliminado por el administrador' });
   
   res.json({ message: 'Evento eliminado exitosamente' });
+});
+
+// Validar código de acceso para un evento
+app.post('/api/eventos/:eventoId/validate-access', (req, res) => {
+  const { eventoId } = req.params;
+  const { code, fullName } = req.body;
+
+  console.log(`🔐 Validando acceso para evento: ${eventoId} con código: ${code}`);
+
+  const eventoInfo = findEvento(eventoId);
+
+  if (eventoInfo && eventoInfo.evento.accessCode === code && eventoInfo.evento.activo) {
+    console.log(`✅ Acceso concedido para: ${fullName}`);
+    res.json({
+      status: 'ok',
+      eventId: eventoInfo.evento.id,
+      eventName: eventoInfo.evento.nombre
+    });
+  } else {
+    console.log(`❌ Acceso denegado. Código incorrecto o evento inactivo.`);
+    res.status(403).json({ error: 'Código de acceso incorrecto o el evento no está activo' });
+  }
 });
 
 // Endpoint para subir foto de evento

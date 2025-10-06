@@ -11,10 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    if (typeof window.Auth === 'undefined') {
-        console.error('Auth no está disponible');
-        return;
-    }
     
     console.log('Todos los módulos cargados correctamente');
     
@@ -38,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Verificar autenticación en páginas de admin
     function checkAuth() {
         const path = window.location.pathname;
-        if (path.startsWith('/admin/') && window.Auth && !window.Auth.isAuthenticated()) {
+        if (path.startsWith('/admin/') && window.FirebaseAuth && !window.FirebaseAuth.isAuthenticated()) {
             if (window.router) {
                 window.router.navigate('/admin');
             } else {

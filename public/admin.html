@@ -132,11 +132,23 @@
 
     <script type="module" src="/js/firebase-config.js"></script>
     <script type="module">
+        console.log('📄 Iniciando script de login en admin.html');
+
         window.addEventListener('load', () => {
+            console.log('🌐 Página cargada, inicializando login en 100ms');
             setTimeout(initializeLogin, 100);
         });
 
         function initializeLogin() {
+            console.log('🔧 Inicializando login...');
+            console.log('FirebaseAuth disponible:', !!window.FirebaseAuth);
+            
+            if (!window.FirebaseAuth) {
+                console.error('❌ FirebaseAuth no está disponible. Esperando...');
+                setTimeout(initializeLogin, 500);
+                return;
+            }
+
             const form = document.getElementById('login-form');
             const alerts = document.getElementById('login-alerts');
             const loading = document.getElementById('login-loading');
@@ -147,9 +159,12 @@
             const googleSigninText = document.getElementById('google-signin-text');
             const googleSigninLoading = document.getElementById('google-signin-loading');
 
+            console.log('✅ Elementos del formulario encontrados');
+
             // Manejar inicio de sesión con Google
             googleSigninBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
+                console.log('🔗 Clic en Google Sign-in');
                 
                 alerts.innerHTML = '';
                 googleSigninLoading.style.display = 'inline-block';
@@ -162,7 +177,7 @@
                     if (result.success) {
                         alerts.innerHTML = `<div class="alert alert-success">¡Bienvenido! Redirigiendo...</div>`;
                         setTimeout(() => {
-                            window.location.href = `/dashboard.html?id=${result.user.uid}`;
+                            window.location.href = `/dashboard?id=${result.user.uid}`;
                         }, 1500);
                     } else {
                         alerts.innerHTML = `<div class="alert alert-error">${result.error}</div>`;
@@ -180,14 +195,19 @@
             // Manejar inicio de sesión
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                console.log('📝 Formulario de login enviado');
 
                 const email = document.getElementById('login-email').value.trim();
                 const password = document.getElementById('login-password').value;
+
+                console.log('📧 Email ingresado:', email);
+                console.log('🔒 Contraseña ingresada (longitud):', password.length);
 
                 alerts.innerHTML = '';
 
                 if (!email || !password) {
                     alerts.innerHTML = `<div class="alert alert-error">Por favor completa todos los campos</div>`;
+                    console.log('❌ Campos vacíos');
                     return;
                 }
 
@@ -196,16 +216,30 @@
                 submitBtn.disabled = true;
 
                 try {
+                    console.log('🚀 Llamando a FirebaseAuth.login...');
                     const result = await window.FirebaseAuth.login(email, password);
 
+                    console.log('📤 Resultado del login:', result);
+
                     if (result.success) {
+                        console.log('✅ Login exitoso, preparando redirección');
+                        console.log('UID del usuario:', result.user.uid);
+                        console.log('Email verificado:', result.emailVerified);
+                        console.log('Datos de funeraria:', result.funerariaData);
+                        
                         alerts.innerHTML = `<div class="alert alert-success">¡Bienvenido! Redirigiendo...</div>`;
                         form.reset();
+                        
+                        const redirectUrl = `/dashboard?id=${result.user.uid}`;
+                        console.log('🔄 Redirigiendo a:', redirectUrl);
+
                         setTimeout(() => {
-                            window.location.href = `/dashboard.html?id=${result.user.uid}`;
+                            console.log('⏰ Ejecutando redirección...');
+                            window.location.href = redirectUrl;
                         }, 1500);
                     } else {
                         alerts.innerHTML = `<div class="alert alert-error">${result.error}</div>`;
+                        console.log('❌ Login falló:', result.error, 'Código:', result.code);
                     }
                 } catch (error) {
                     console.error('Error en login:', error);
@@ -220,6 +254,7 @@
             // Manejar recuperación de contraseña
             forgotPasswordLink.addEventListener('click', async (e) => {
                 e.preventDefault();
+                console.log('🔑 Clic en recuperar contraseña');
                 
                 const email = document.getElementById('login-email').value.trim();
                 
@@ -245,9 +280,12 @@
             if (window.FirebaseAuth && window.FirebaseAuth.isAuthenticated()) {
                 const user = window.FirebaseAuth.getCurrentUser();
                 if (user) {
-                    window.location.href = `/dashboard.html?id=${user.uid}`;
+                    console.log('👤 Usuario ya autenticado, redirigiendo...');
+                    window.location.href = `/dashboard?id=${user.uid}`;
                 }
             }
+
+            console.log('✅ Login inicializado correctamente');
         }
     </script>
 </body>
