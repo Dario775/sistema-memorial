@@ -9,7 +9,8 @@ import {
     sendPasswordResetEmail,
     updateProfile,
     GoogleAuthProvider,
-    signInWithPopup
+    signInWithPopup,
+    connectAuthEmulator
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { 
     getFirestore, 
@@ -22,7 +23,8 @@ import {
     where, 
     getDocs,
     updateDoc,
-    deleteDoc
+    deleteDoc,
+    connectFirestoreEmulator
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // Configuración de Firebase
@@ -39,6 +41,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Conectar a los emuladores en desarrollo
+if (window.location.hostname === 'localhost') {
+    connectAuthEmulator(auth, 'http://localhost:9099');
+    connectFirestoreEmulator(db, 'localhost', 8081);
+}
 
 // Clase para manejar la autenticación con Firebase
 class FirebaseAuth {
@@ -309,9 +317,8 @@ class FirebaseAuth {
         }
 
         try {
-            const docRef = await addDoc(collection(db, 'eventos'), {
+            const docRef = await addDoc(collection(db, 'funerarias', this.currentUser.uid, 'eventos'), {
                 ...eventoData,
-                funerariaId: this.currentUser.uid,
                 fechaCreacion: new Date().toISOString(),
                 activo: true,
                 accessCode: this.generateAccessCode()
@@ -335,11 +342,10 @@ class FirebaseAuth {
 
         try {
             const q = query(
-                collection(db, 'eventos'), 
-                where('funerariaId', '==', this.currentUser.uid)
+                collection(db, 'funerarias', this.currentUser.uid, 'eventos')
             );
             const querySnapshot = await getDocs(q);
-            
+
             const eventos = [];
             querySnapshot.forEach((doc) => {
                 eventos.push({
